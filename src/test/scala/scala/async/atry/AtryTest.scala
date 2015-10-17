@@ -11,12 +11,14 @@ object AtryTest extends App {
   val fut = async {
 
     atry {
-      throw new IllegalArgumentException
+//      throw new IllegalArgumentException
+      throw new NullPointerException
       await(Future(1 + 1))
 //      await(Future(throw new IllegalArgumentException))
       1
     } acatch {
-      case e: IllegalArgumentException => 2
+      case e: IllegalArgumentException => await(Future(1+3))
+      case e: NullPointerException => await(Future(1+4))
     }
   }
 

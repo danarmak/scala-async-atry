@@ -8,22 +8,25 @@ import scala.async.Async._
 import scala.util.{Failure, Success, Try}
 
 class Acatchable[T](val result: Try[T]) extends AnyVal {
-  def acatch[U >: T](handler: PartialFunction[Throwable, U])
-                    (implicit ec: ExecutionContext): U = result match {
-    case Success(t) => t
-    case Failure(t) => handler.applyOrElse(t, (t: Throwable) => throw t)
-  }
+  def acatch[U >: T](handler: Throwable => U): U = macro Acatchable.acatchImpl[T, U]
 }
 
 object Acatchable {
-  def wrap[T](block: => T): Acatchable[T] = new Acatchable[T](
-    try {
-      Success(block)
-    }
-    catch {
-      case t: Throwable => Failure(t)
-    }
-  )
+  def acatchImpl[T: c.WeakTypeTag, U >: T : c.WeakTypeTag](c: Context)(handler: c.Expr[Throwable => U]): c.Expr[U] = {
+    import c.universe._
+
+    val q"(..$params) => $body" = handler.tree
+    val q"$param match { case ..$cases }" = body
+
+    val tried = q"${c.prefix.tree}.result"
+    
+    val tree =
+      q"""$tried match {
+         case scala.util.Success(t) => t
+         case scala.util.Failure(e) => e match { case ..$cases }
+       }"""
+    c.Expr[U](tree)
+  }
 }
 
 class Atry(val c: Context) {
